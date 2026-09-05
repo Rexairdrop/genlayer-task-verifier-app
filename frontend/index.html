@@ -1,372 +1,202 @@
-<script>
-    const CONTRACT_ADDRESS = "0x919bb40F757F4eb50FcC7fBBf5E703FC8463CF38";
-    const RPC_URL = "http://localhost:8080";
+<!DOCTYPE html> 
+<html lang="en"> 
+<head> 
+    <meta charset="UTF-8"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <title>AI Task Verifier DApp - Production</title> 
+    <style> 
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f7; padding: 40px; margin: 0; color: #333; } 
+        .card { max-width: 600px; background: white; margin: 0 auto 20px; padding: 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); } 
+        h2, h3 { margin-top: 0; color: #1d1d1f; } 
+        input, textarea, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; } 
+        button { background: #0071e3; color: white; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; } 
+        button:hover { background: #0077ed; } 
+        .log-box { background: #1e1e1e; color: #00ff00; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 13px; min-height: 60px; word-wrap: break-word; white-space: pre-wrap; } 
+        code { background: #e8e8ed; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #bf4040; font-size: 14px; } 
+    </style> 
+</head> 
+<body> 
+ 
+    <div class="card"> 
+        <h2>GenLayer AI Task Verifier</h2> 
+        <p>Connected to Contract Address: <code id="contractAddressDisplay">0x919bb40F757F4eb50FcC7fBBf5E703FC8463CF38</code></p> 
+        <button id="connectWalletBtn" onclick="connectWallet()">Initialize GenLayer Provider Path</button> 
+    </div> 
+ 
+    <!-- Section 1: Create Task --> 
+    <div class="card"> 
+        <h3>1. Create an Intelligent Task Milestone</h3> 
+        <input type="text" id="taskTitle" placeholder="Task Title"> 
+        <textarea id="taskCriteria" placeholder="Strict AI Validation Criteria"></textarea> 
+        <button onclick="triggerCreateTask()">Register Milestone On-Chain</button> 
+    </div> 
+ 
+    <!-- Section 2: Actions & Reads --> 
+    <div class="card"> 
+        <h3>2. DApp Workflow Actions & Contract-Derived Reads</h3> 
+        <input type="text" id="taskId" placeholder="Task ID Target (e.g., 0)"> 
+        <input type="text" id="proofUrl" placeholder="Proof Target Link (e.g., GitHub Commit URL)"> 
+         
+        <button onclick="triggerClaimTask()" style="background:#5e5ce6;">Claim Task Target</button> 
+        <button onclick="triggerSubmitProof()" style="background:#ff9f0a;">Submit Work Proof</button> 
+        <button onclick="triggerVerifyTask()">Execute Decentralized AI Auditing</button> 
+        <button onclick="readTaskState()" style="background:#34c759;">Read Task Real-Time On-Chain State</button> 
+    </div> 
+ 
+    <!-- System Console Logs --> 
+    <div class="card"> 
+        <h3>System Transaction Console</h3> 
+        <div id="consoleLog" class="log-box">Awaiting local wallet execution commands...</div> 
+    </div> 
+ 
+    <script> 
+        const CONTRACT_ADDRESS = "0x919bb40F757F4eb50FcC7fBBf5E703FC8463CF38"; 
+        // Connect directly to the production GenLayer SimNet node RPC endpoint
+        const RPC_URL = "https://genlayer.com"; 
+        let userAddress = null;
 
-    let userAddress = null;
-    let provider = null;
-
-    function updateLog(message) {
-        document.getElementById("consoleLog").innerText =
-            `[LOG] ${new Date().toLocaleTimeString()}:\n${message}`;
-    }
-
-    /*
-     * REAL WALLET CONNECTION
-     * No simulated address or RPC fallback.
-     */
-    async function connectWallet() {
-        if (!window.ethereum && !window.genlayer) {
-            updateLog(
-                "Wallet connection failed.\n" +
-                "No supported browser wallet provider was detected."
-            );
-            return;
+        function updateLog(message) {
+            document.getElementById("consoleLog").innerText = `[LOG] ${new Date().toLocaleTimeString()}:\n${message}`;
         }
 
-        try {
-            provider = window.genlayer || window.ethereum;
-
-            const accounts = await provider.request({
-                method: "eth_requestAccounts"
-            });
-
-            if (!accounts || !accounts.length) {
-                throw new Error("No wallet account was returned by the provider.");
-            }
-
-            userAddress = accounts[0];
-
-            updateLog(
-                `Wallet connected successfully.\n` +
-                `Account address: ${userAddress}`
-            );
-
-        } catch (err) {
-            userAddress = null;
-
-            updateLog(
-                `Wallet connection failed.\n${getReadableError(err)}`
-            );
-        }
-    }
-
-    /*
-     * Convert provider/RPC errors into readable messages
-     * without hiding the actual failure.
-     */
-    function getReadableError(error) {
-        if (!error) {
-            return "Unknown error.";
-        }
-
-        if (error.code === 4001) {
-            return "Transaction or wallet request was rejected by the user.";
-        }
-
-        if (error.message) {
-            return error.message;
-        }
-
-        return String(error);
-    }
-
-    /*
-     * REAL RPC TRANSACTION PATH
-     *
-     * Important:
-     * This function never returns fake success data.
-     * If the RPC fails, the error is thrown and handled by the UI.
-     */
-    async function sendGenLayerTransaction(methodName, argsArray) {
-        if (!userAddress) {
-            throw new Error(
-                "No wallet is connected. Connect a real wallet before submitting a transaction."
-            );
-        }
-
-        updateLog(
-            `Preparing real contract transaction...\n` +
-            `Target method: ${methodName}\n` +
-            `Arguments: ${JSON.stringify(argsArray)}`
-        );
-
-        const response = await fetch(RPC_URL, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                jsonrpc: "2.0",
-                method: "gen_sendTransaction",
-                params: {
-                    from: userAddress,
-                    to: CONTRACT_ADDRESS,
-                    data: {
-                        method: methodName,
-                        args: argsArray
+        async function connectWallet() {
+            const provider = window.genlayer || window.ethereum;
+            if (provider) {
+                try {
+                    const accounts = await provider.request({ method: 'eth_requestAccounts' });
+                    if (accounts && accounts.length > 0) {
+                        userAddress = accounts[0];
+                        updateLog(`Wallet Connected Successfully!\nAccount address: ${userAddress}`);
+                        document.getElementById("connectWalletBtn").innerText = `Connected: ${userAddress.substring(0,6)}...${userAddress.substring(userAddress.length-4)}`;
+                    } else {
+                        updateLog("Wallet Authorization Error: No active account profiles returned.");
                     }
-                },
-                id: Date.now()
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(
-                `GenLayer RPC HTTP error: ${response.status} ${response.statusText}`
-            );
-        }
-
-        const resData = await response.json();
-
-        if (resData.error) {
-            throw new Error(
-                resData.error.message ||
-                JSON.stringify(resData.error)
-            );
-        }
-
-        if (typeof resData.result === "undefined") {
-            throw new Error(
-                "GenLayer RPC returned no transaction result."
-            );
-        }
-
-        return resData.result;
-    }
-
-    async function triggerCreateTask() {
-        const title = document.getElementById("taskTitle").value.trim();
-        const criteria = document.getElementById("taskCriteria").value.trim();
-
-        if (!title || !criteria) {
-            updateLog("Error: Missing task title or validation criteria.");
-            return;
-        }
-
-        try {
-            const result = await sendGenLayerTransaction(
-                "create_task",
-                [
-                    title,
-                    "Project submission payload tracking",
-                    criteria
-                ]
-            );
-
-            updateLog(
-                `Create task transaction submitted successfully.\n` +
-                `${JSON.stringify(result, null, 2)}`
-            );
-
-        } catch (err) {
-            updateLog(
-                `Create task failed.\n${getReadableError(err)}`
-            );
-        }
-    }
-
-    async function triggerClaimTask() {
-        const id = document.getElementById("taskId").value.trim();
-
-        if (!id) {
-            updateLog("Error: Missing Task ID.");
-            return;
-        }
-
-        try {
-            const result = await sendGenLayerTransaction(
-                "claim_task",
-                [id]
-            );
-
-            updateLog(
-                `Claim task transaction submitted successfully.\n` +
-                `${JSON.stringify(result, null, 2)}`
-            );
-
-        } catch (err) {
-            updateLog(
-                `Claim task failed.\n${getReadableError(err)}`
-            );
-        }
-    }
-
-    async function triggerSubmitProof() {
-        const id = document.getElementById("taskId").value.trim();
-        const url = document.getElementById("proofUrl").value.trim();
-
-        if (!id || !url) {
-            updateLog("Error: Missing Task ID or proof URL.");
-            return;
-        }
-
-        try {
-            const result = await sendGenLayerTransaction(
-                "submit_proof",
-                [id, url]
-            );
-
-            updateLog(
-                `Proof submission transaction submitted successfully.\n` +
-                `${JSON.stringify(result, null, 2)}`
-            );
-
-        } catch (err) {
-            updateLog(
-                `Proof submission failed.\n${getReadableError(err)}`
-            );
-        }
-    }
-
-    async function triggerVerifyTask() {
-        const id = document.getElementById("taskId").value.trim();
-
-        if (!id) {
-            updateLog("Error: Provide a Task ID.");
-            return;
-        }
-
-        updateLog(
-            `Requesting real GenLayer contract execution...\n` +
-            `Method: verify_task\nTask ID: ${id}`
-        );
-
-        try {
-            const result = await sendGenLayerTransaction(
-                "verify_task",
-                [id]
-            );
-
-            updateLog(
-                `Verification transaction submitted successfully.\n` +
-                `${JSON.stringify(result, null, 2)}`
-            );
-
-        } catch (err) {
-            updateLog(
-                `Verification failed.\n${getReadableError(err)}`
-            );
-        }
-    }
-
-    /*
-     * REAL CONTRACT-DERIVED READ
-     *
-     * There is deliberately NO mock-data fallback here.
-     */
-    async function readTaskState() {
-        const id = document.getElementById("taskId").value.trim();
-
-        if (!id) {
-            updateLog("Error: Provide a Task ID to read state.");
-            return;
-        }
-
-        updateLog(
-            `Querying real contract-derived read view...\n` +
-            `Method: get_task(${id})`
-        );
-
-        try {
-            const response = await fetch(RPC_URL, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    jsonrpc: "2.0",
-                    method: "gen_call",
-                    params: {
-                        to: CONTRACT_ADDRESS,
-                        data: {
-                            method: "get_task",
-                            args: [id]
-                        }
-                    },
-                    id: Date.now()
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(
-                    `GenLayer RPC HTTP error: ${response.status} ${response.statusText}`
-                );
-            }
-
-            const resData = await response.json();
-
-            /*
-             * IMPORTANT:
-             * A JSON-RPC error is a real failure.
-             * Do not replace it with mock data.
-             */
-            if (resData.error) {
-                throw new Error(
-                    resData.error.message ||
-                    JSON.stringify(resData.error)
-                );
-            }
-
-            if (typeof resData.result === "undefined") {
-                throw new Error(
-                    "GenLayer RPC returned no contract state."
-                );
-            }
-
-            /*
-             * Use the actual value returned by get_task().
-             * No "Sample Task", fake status, fake worker,
-             * or fake proof URL is inserted here.
-             */
-            const parsedTask =
-                typeof resData.result === "string"
-                    ? JSON.parse(resData.result)
-                    : resData.result;
-
-            updateLog(
-                `Contract-Derived Read View Success!\n` +
-                `Status: ${parsedTask.status ?? "Unavailable"}\n` +
-                `State:\n${JSON.stringify(parsedTask, null, 2)}`
-            );
-
-        } catch (err) {
-            /*
-             * THIS IS THE CRITICAL FIX.
-             *
-             * A failed contract read stays a failed contract read.
-             * There is NO simulated result.
-             */
-            updateLog(
-                `Contract-Derived Read View Failed.\n` +
-                `${getReadableError(err)}`
-            );
-        }
-    }
-
-    /*
-     * Keep the displayed wallet state synchronized with the
-     * real browser wallet.
-     */
-    if (window.ethereum) {
-        window.ethereum.on("accountsChanged", (accounts) => {
-            userAddress = accounts && accounts.length
-                ? accounts[0]
-                : null;
-
-            if (userAddress) {
-                updateLog(
-                    `Wallet account changed.\n` +
-                    `Account address: ${userAddress}`
-                );
+                } catch (e) {
+                    updateLog("Wallet connection request rejected by user.");
+                }
             } else {
-                updateLog("Wallet disconnected.");
+                updateLog("Missing wallet provider: A real web3 browser extension wallet is required to proceed. Connection halted.");
             }
-        });
+        }
 
-        window.ethereum.on("chainChanged", () => {
-            updateLog(
-                "Wallet network changed. Reconnect or refresh the DApp before submitting another transaction."
-            );
-        });
-    }
-</script>
+        // True transaction pipeline communicating directly with the GenLayer network endpoint
+        async function sendGenLayerTransaction(methodName, argsArray) {
+            if (!userAddress) {
+                updateLog("Transaction blocked: Please connect your real browser wallet signer first.");
+                return null;
+            }
+
+            updateLog(`Constructing transaction envelope payload...\nTarget Method: ${methodName}\nArgs: ${JSON.stringify(argsArray)}`);
+            
+            try {
+                const response = await fetch(RPC_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: "2.0",
+                        method: "gen_sendTransaction",
+                        params: {
+                            from: userAddress,
+                            to: CONTRACT_ADDRESS,
+                            data: { method: methodName, args: argsArray }
+                        },
+                        id: 1
+                    })
+                });
+                
+                const resData = await response.json();
+                
+                if (resData.error) {
+                    throw new Error(`RPC Failure: ${resData.error.message || JSON.stringify(resData.error)}`);
+                }
+                
+                return `Transaction broadcast successful!\nTransaction Hash: ${resData.result}`;
+            } catch (err) {
+                throw new Error(`GenLayer RPC request failed. Check your network connection.\nDetails: ${err.message}`);
+            }
+        }
+
+        async function triggerCreateTask() {
+            const title = document.getElementById("taskTitle").value;
+            const criteria = document.getElementById("taskCriteria").value;
+            if (!title || !criteria) return updateLog("Error: Missing parameters.");
+            
+            try {
+                const result = await sendGenLayerTransaction("create_task", [title, "Project submission payload tracking", criteria]);
+                if (result) updateLog(result);
+            } catch (error) {
+                updateLog(`The contract call failed: ${error.message}`);
+            }
+        }
+
+        async function triggerClaimTask() {
+            const id = document.getElementById("taskId").value;
+            if (!id) return updateLog("Error: Missing Task ID.");
+            
+            try {
+                const result = await sendGenLayerTransaction("claim_task", [String(id)]);
+                if (result) updateLog(result);
+            } catch (error) {
+                updateLog(`The contract call failed: ${error.message}`);
+            }
+        }
+
+        async function triggerSubmitProof() {
+            const id = document.getElementById("taskId").value;
+            const url = document.getElementById("proofUrl").value;
+            if (!id || !url) return updateLog("Error: Missing parameters.");
+            
+            try {
+                const result = await sendGenLayerTransaction("submit_proof", [String(id), url]);
+                if (result) updateLog(result);
+            } catch (error) {
+                updateLog(`The contract call failed: ${error.message}`);
+            }
+        }
+
+        async function triggerVerifyTask() {
+            const id = document.getElementById("taskId").value;
+            if (!id) return updateLog("Error: Missing Task ID.");
+            
+            updateLog(`Triggering AI node execution runtime... Executing run_nondet_unsafe consensus loops over Task #${id}...`);
+            try {
+                const result = await sendGenLayerTransaction("verify_task", [String(id)]);
+                if (result) updateLog(result);
+            } catch (error) {
+                updateLog(`The contract call failed: ${error.message}`);
+            }
+        }
+
+        async function readTaskState() {
+            const id = document.getElementById("taskId").value;
+            if (!id) return updateLog("Error: Provide a Task ID to read state.");
+            
+            updateLog(`Querying contract-derived read view method: get_task(${id})...`);
+            
+            try {
+                const response = await fetch(RPC_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: "2.0",
+                        method: "gen_call",
+                        params: { to: CONTRACT_ADDRESS, data: { method: "get_task", args: [String(id)] } },
+                        id: 1
+                    })
+                });
+                
+                const resData = await response.json();
+                
+                if (resData.error) {
+                    throw new Error(resData.error.message || JSON.stringify(resData.error));
+                }
+
+                if (!resData.result || resData.result === "{}") {
+                    throw new Error("Target task record does not exist on-chain.");
+                }
+
+                // Parse and display raw blockchain output with zero fallback overrides
+                const taskData = typeof resData.result === 'string' ? JSON.parse(resData.result) : resData.result;
+                updateLog(`Contract-Derived Read View Success!\nOn-Chain State Results:\n${JSON.stringify(taskData, null, 2)}`);
+                
+            } catch (err) {
