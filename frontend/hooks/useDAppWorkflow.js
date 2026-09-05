@@ -5,12 +5,12 @@ const CONTRACT_ADDRESS = "0x919bb40F757F4eb50FcC7fBBf5E703FC8463CF38";
 const GENLAYER_RPC_URL = process.env.NEXT_PUBLIC_GENLAYER_RPC_URL || "https://genlayer.com";
 
 export function useDAppWorkflow(account) {
-  const [logs, setLogs] = useState([{ text: "System initialized. Awaiting live wallet execution...", type: 'info' }]);
+  const [logs, setLogs] = useState([{ text: "System initialized. Awaiting true transaction execution...", type: 'info' }]);
   const [isPending, setIsPending] = useState(false);
 
   const addLog = (text, type) => setLogs(prev => [...prev, { text, type }]);
 
-  // Direct Contract Write Actions
+  // Direct Contract Write Wrapper
   const runContractWrite = async (methodName, args, actionLabel) => {
     if (!account) return addLog(`Error: Connect a wallet to sign ${actionLabel}.`, "error");
     setIsPending(true);
@@ -44,24 +44,48 @@ export function useDAppWorkflow(account) {
     }
   };
 
-  // Pure RPC Contract Read State (No local mock data fallback)
-  const readTaskState = async (milestoneId) => {
-    addLog(`Fetching true state parameters for Milestone #${milestoneId}...`, "info");
+  // 1. CREATE TASK
+  const createTask = async (title, description, criteria) => {
+    await runContractWrite("create_task", [title, description, criteria], "Create Task");
+  };
+
+  // 2. CLAIM TASK
+  const claimTask = async (taskId) => {
+    await runContractWrite("claim_task", [String(taskId)], "Claim Task");
+  };
+
+  // 3. SUBMIT PROOF
+  const submitProof = async (taskId, proofUrl) => {
+    await runContractWrite("submit_proof", [String(taskId), proofUrl], "Submit Proof");
+  };
+
+  // 4. VERIFY TASK (Triggers Validator Consensus)
+  const verifyTask = async (taskId) => {
+    await runContractWrite("verify_task", [String(taskId)], "Verify Task");
+  };
+
+  // 5. PURE RPC READ STATE (No mock fallback)
+  const readTaskState = async (taskId) => {
+    addLog(`Fetching true parameters for Task #${taskId} from blockchain RPC...`, "info");
     try {
       const client = createClient({ rpcUrl: GENLAYER_RPC_URL });
-      const stateResult = await client.readContract({
+      const rawResult = await client.readContract({
         to: CONTRACT_ADDRESS,
-        data: { method: "get_milestone_state", args: [milestoneId] }
+        data: { method: "get_task", args: [String(taskId)] }
       });
 
-      if (!stateResult) throw new Error("Empty execution structure returned from RPC.");
-      addLog(`On-Chain State: Status: ${stateResult.status} | Consensus Score: ${stateResult.score}/100`, "success");
-      return stateResult;
+      if (!rawResult || rawResult === "{}") throw new Error("Task not found or empty response returned.");
+      
+      const parsedTask = typeof rawResult === 'string' ? JSON.parse(rawResult) : rawResult;
+      addLog(`On-Chain State: Status: ${parsedTask.status} | Result: ${parsedTask.result}`, "success");
+      if (parsedTask.reasoning) addLog(`AI Reasoning: ${parsedTask.reasoning}`, "info");
+      
+      return parsedTask;
     } catch (error) {
       addLog(`State Fetch Failed: ${error.message || 'GenLayer RPC network unreachable.'}`, "error");
       return null;
     }
   };
 
-  return { runContractWrite, readTaskState, logs, isPending };
+  return { createTask, claimTask, submitProof, verifyTask, readTaskState, logs, isPending };
 }
