@@ -1,0 +1,8 @@
+{
+  "validators_count": 5,
+  "llm_providers": {
+    "gemini": {
+      "api_key": "AQ.Ab8RN6J82zNvmA316lWH0LuUX5y2oOD3iK15Ed_7__z6qGP6DA"
+    }
+  }
+}
