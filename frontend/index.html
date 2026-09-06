@@ -15,7 +15,7 @@
         .log-box { background: #1e1e1e; color: #00ff00; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 13px; min-height: 60px; word-wrap: break-word; white-space: pre-wrap; } 
         code { background: #e8e8ed; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #bf4040; font-size: 14px; } 
 
-        /* DYNAMIC ADDITION: Sleek Wallet Selection Modal Overlays */
+        /* Custom Selection Menu Modal Layouts */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 1000; }
         .modal-box { background: white; padding: 30px; border-radius: 16px; max-width: 400px; width: 90%; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.15); box-sizing: border-box; }
         .modal-box h4 { margin-top: 0; font-size: 20px; color: #1d1d1f; margin-bottom: 20px; }
@@ -30,7 +30,6 @@
     <div class="card"> 
         <h2>GenLayer AI Task Verifier</h2> 
         <p>Connected to Contract Address: <code id="contractAddressDisplay">0x919bb40F757F4eb50FcC7fBBf5E703FC8463CF38</code></p> 
-        <!-- Triggers the custom choice popup modal instantly -->
         <button id="connectWalletBtn" onclick="openWalletModal()">Connect Genlayer Wallet</button> 
     </div> 
  
@@ -60,7 +59,7 @@
         <div id="consoleLog" class="log-box">Awaiting local wallet execution commands...</div> 
     </div> 
 
-    <!-- MULTI-WALLET CHOICE SELECTION MODAL LAYOUT -->
+    <!-- SELECTION MODAL LAYER -->
     <div id="walletModal" class="modal-overlay" onclick="closeWalletModal(event)">
         <div class="modal-box" onclick="event.stopPropagation()">
             <h4>Select Your Web3 Wallet</h4>
@@ -73,7 +72,7 @@
                 <span>🦊</span> MetaMask Wallet
             </div>
             
-            <button class="close-modal" onclick="document.getElementById('walletModal').style.display = 'none'">Cancel</button>
+            <button class="close-modal" onclick="closeModalDirectly()">Cancel</button>
         </div>
     </div>
  
@@ -84,70 +83,76 @@
         let activeProvider = null;
 
         function updateLog(message) {
-            document.getElementById("consoleLog").innerText = `[LOG] ${new Date().toLocaleTimeString()}:\n${message}`;
+            const consoleEl = document.getElementById("consoleLog");
+            if (consoleEl) {
+                consoleEl.innerText = `[LOG] ${new Date().toLocaleTimeString()}:\n${message}`;
+            }
         }
 
-        // Open choice window overlay
-        function openWalletModal() {
+        // Direct Window Bindings to ensure elements can always execute them on-click
+        window.openWalletModal = function() {
             document.getElementById('walletModal').style.display = 'flex';
-        }
+        };
 
-        // Close choice window overlay safely
-        function closeWalletModal(event) {
+        window.closeWalletModal = function(event) {
             document.getElementById('walletModal').style.display = 'none';
-        }
+        };
 
-        // Handle specific selection choice mapping
-        async function selectWalletProvider(walletType) {
-            // Hide selection overlay immediately
+        window.closeModalDirectly = function() {
+            document.getElementById('walletModal').style.display = 'none';
+        };
+
+        window.selectWalletProvider = async function(walletType) {
             document.getElementById('walletModal').style.display = 'none';
             const btn = document.getElementById("connectWalletBtn");
-            
             let provider = null;
             
             if (walletType === 'genlayer') {
                 provider = window.genlayer || (window.ethereum && window.ethereum.isGenLayer ? window.ethereum : null);
-                updateLog("Attempting to connect to GenLayer Wallet Extension...");
+                updateLog("Connecting to GenLayer Extension...");
             } else if (walletType === 'metamask') {
                 provider = window.ethereum && !window.ethereum.isGenLayer ? window.ethereum : null;
-                updateLog("Attempting to connect to MetaMask Wallet Extension...");
+                updateLog("Connecting to MetaMask Extension...");
             }
             
             if (provider) {
                 try {
                     btn.innerText = "Connecting...";
-                    // Native request trigger execution block
                     const accounts = await provider.request({ method: 'eth_requestAccounts' });
-                    userAddress = Array.isArray(accounts) ? accounts[0] : accounts;
+                    
+                    // Secure address parsing logic
+                    if (Array.isArray(accounts) && accounts.length > 0) {
+                        userAddress = accounts[0];
+                    } else if (typeof accounts === 'string') {
+                        userAddress = accounts;
+                    } else {
+                        userAddress = accounts;
+                    }
                     
                     if (userAddress) {
-                        activeProvider = provider; // Cache configuration target provider context references
-                        btn.innerText = `Connected: ${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`;
+                        activeProvider = provider;
+                        btn.innerText = `Connected: ${String(userAddress).slice(0, 6)}...${String(userAddress).slice(-4)}`;
                         btn.style.backgroundColor = "#34c759";
                         updateLog(`Wallet Connected Successfully!\nType: ${walletType.toUpperCase()}\nActive address: ${userAddress}`);
-                    } else {
-                        throw new Error("No accounts found inside provider profile parameters.");
                     }
                 } catch (e) {
                     btn.innerText = "Connect Genlayer Wallet";
                     btn.style.backgroundColor = "#0071e3";
-                    updateLog(`Connection Cancelled or Rejected: ${e.message}`);
+                    updateLog(`Connection Cancelled: ${e.message}`);
                 }
             } else {
                 btn.innerText = "Connect Genlayer Wallet";
-                const missingWalletName = walletType === 'genlayer' ? 'GenLayer Wallet Extension' : 'MetaMask';
-                updateLog(`Error: ${missingWalletName} not detected inside your browser bar.`);
-                alert(`Please install or activate the ${missingWalletName} extension to run connection strings.`);
+                updateLog(`Error: Chosen extension provider was not found active in this browser tab.`);
+                alert(`Wallet extension not found! Ensure it is installed and enabled.`);
             }
-        }
+        };
 
         async function sendGenLayerTransaction(methodName, argsArray) {
             if (!userAddress) {
-                updateLog(`Error: Connect your wallet selection first before running transactions.`);
+                updateLog(`Error: Connect your wallet first.`);
                 return null;
             }
-            updateLog(`Constructing transaction envelope...\nTarget Method: ${methodName}\nArgs: ${JSON.stringify(argsArray)}`);
-            
+            updateLog(`Broadcasting transaction payload to GenVM localnet RPC...`);
             try {
                 const response = await fetch(RPC_URL, {
                     method: 'POST',
@@ -168,12 +173,13 @@
                     updateLog(`Transaction execution failed: ${resData.error.message || JSON.stringify(resData.error)}`);
                     return null;
                 }
-                return resData.result || `Success payload recorded on block state.`;
+                return resData.result || `Success snapshot hash logged onto localnet block environment.`;
             } catch (err) {
                 return `Transaction broadcast failure: ${err.message}`;
             }
         }
 
-        async function triggerCreateTask() {
+        window.triggerCreateTask = async function() {
             const title = document.getElementById("taskTitle").value;
             const criteria = document.getElementById("taskCriteria").value;
+            if (!title || !criteria) return updateLog("Error: Missing parameters.");
