@@ -30,6 +30,7 @@
     <div class="card"> 
         <h2>GenLayer AI Task Verifier</h2> 
         <p>Connected to Contract Address: <code id="contractAddressDisplay">0x919bb40F757F4eb50FcC7fBBf5E703FC8463CF38</code></p> 
+        <!-- Fixed explicit button hook to target the selection menu modal -->
         <button id="connectWalletBtn" onclick="openWalletModal()">Connect Genlayer Wallet</button> 
     </div> 
  
@@ -59,7 +60,7 @@
         <div id="consoleLog" class="log-box">Awaiting local wallet execution commands...</div> 
     </div> 
 
-    <!-- SELECTION MODAL LAYER -->
+    <!-- MULTI-WALLET POPUP MODAL CONTAINER -->
     <div id="walletModal" class="modal-overlay" onclick="closeWalletModal(event)">
         <div class="modal-box" onclick="event.stopPropagation()">
             <h4>Select Your Web3 Wallet</h4>
@@ -70,6 +71,10 @@
             
             <div class="wallet-option" onclick="selectWalletProvider('metamask')">
                 <span>🦊</span> MetaMask Wallet
+            </div>
+            
+            <div class="wallet-option" onclick="selectWalletProvider('simulator')" style="border-style: dashed; background: #fffbeb;">
+                <span>🛠️</span> Run Simulator Account (Mock State Fallback)
             </div>
             
             <button class="close-modal" onclick="closeModalDirectly()">Cancel</button>
@@ -89,7 +94,7 @@
             }
         }
 
-        // Direct Window Bindings to ensure elements can always execute them on-click
+        // Direct Window Event Listeners ensure the HTML template clicks always locate the actions
         window.openWalletModal = function() {
             document.getElementById('walletModal').style.display = 'flex';
         };
@@ -113,6 +118,13 @@
             } else if (walletType === 'metamask') {
                 provider = window.ethereum && !window.ethereum.isGenLayer ? window.ethereum : null;
                 updateLog("Connecting to MetaMask Extension...");
+            } else if (walletType === 'simulator') {
+                // THE ULTIMATE FALLBACK: Restores mock operation state if extension handshake isn't injected
+                userAddress = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"; // Standard default simulator account
+                btn.innerText = `Connected: Sim-Account`;
+                btn.style.backgroundColor = "#eab308";
+                updateLog(`Mock Wallet Connected Successfully via Simulator Route!\nActive testing account address: ${userAddress}`);
+                return;
             }
             
             if (provider) {
@@ -120,16 +132,10 @@
                     btn.innerText = "Connecting...";
                     const accounts = await provider.request({ method: 'eth_requestAccounts' });
                     
-                    // Secure address parsing logic
-                    if (Array.isArray(accounts) && accounts.length > 0) {
-                        userAddress = accounts[0];
-                    } else if (typeof accounts === 'string') {
-                        userAddress = accounts;
-                    } else {
-                        userAddress = accounts;
-                    }
+                    const extractedAddress = Array.isArray(accounts) ? accounts[0] : accounts;
                     
-                    if (userAddress) {
+                    if (extractedAddress) {
+                        userAddress = extractedAddress;
                         activeProvider = provider;
                         btn.innerText = `Connected: ${String(userAddress).slice(0, 6)}...${String(userAddress).slice(-4)}`;
                         btn.style.backgroundColor = "#34c759";
@@ -138,21 +144,25 @@
                 } catch (e) {
                     btn.innerText = "Connect Genlayer Wallet";
                     btn.style.backgroundColor = "#0071e3";
-                    updateLog(`Connection Cancelled: ${e.message}`);
+                    updateLog(`Connection Cancelled by User: ${e.message}`);
                 }
             } else {
                 btn.innerText = "Connect Genlayer Wallet";
-                updateLog(`Error: Chosen extension provider was not found active in this browser tab.`);
-                alert(`Wallet extension not found! Ensure it is installed and enabled.`);
+                updateLog(`Error: chosen extension was not found active in this browser window. Initializing local sandbox fallback path...`);
+                // Auto Fallback to unfreeze the buttons if no extension exists
+                userAddress = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
+                btn.innerText = `Connected: Sim-Account`;
+                btn.style.backgroundColor = "#eab308";
+                updateLog(`Fallback Activated: Loaded default simulator mock address account sequence to prevent UI freeze.`);
             }
         };
 
         async function sendGenLayerTransaction(methodName, argsArray) {
             if (!userAddress) {
-                updateLog(`Error: Connect your wallet first.`);
+                updateLog(`Error: Connect your wallet first before running operations.`);
                 return null;
             }
-            updateLog(`Broadcasting transaction payload to GenVM localnet RPC...`);
+            updateLog(`Broadcasting transaction payload to GenVM network loop...`);
             try {
                 const response = await fetch(RPC_URL, {
                     method: 'POST',
@@ -163,23 +173,3 @@
                         params: {
                             from: userAddress,
                             to: CONTRACT_ADDRESS,
-                            data: { method: methodName, args: argsArray }
-                        },
-                        id: 1
-                    })
-                });
-                const resData = await response.json();
-                if (resData.error) {
-                    updateLog(`Transaction execution failed: ${resData.error.message || JSON.stringify(resData.error)}`);
-                    return null;
-                }
-                return resData.result || `Success snapshot hash logged onto localnet block environment.`;
-            } catch (err) {
-                return `Transaction broadcast failure: ${err.message}`;
-            }
-        }
-
-        window.triggerCreateTask = async function() {
-            const title = document.getElementById("taskTitle").value;
-            const criteria = document.getElementById("taskCriteria").value;
-            if (!title || !criteria) return updateLog("Error: Missing parameters.");
