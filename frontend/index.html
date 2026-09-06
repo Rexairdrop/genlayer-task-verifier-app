@@ -61,128 +61,135 @@
     </div> 
  
     <!-- Unified Script Module Integration Using Real SDK Client Engines -->
-    <script type="module"> 
-        import { createClient } from 'genlayer-js';
+     <script type="module"> 
+    import { createClient } from 'genlayer-js';
 
-        const CONTRACT_ADDRESS = "0x919bb40F757F4eb50FcC7fBBf5E703FC8463CF38"; 
-        // Real GenLayer Client Node RPC Route Endpoint
-        const GENLAYER_RPC_URL = "http://localhost:4000/api"; 
+    const CONTRACT_ADDRESS = "0x919bb40F757F4eb50FcC7fBBf5E703FC8463CF38"; 
+    const GENLAYER_RPC_URL = "http://localhost:4000/api"; 
+    
+    let userAddress = null;
+    let genlayerClient = null;
+
+    try {
+        genlayerClient = createClient({ rpcUrl: GENLAYER_RPC_URL });
+    } catch(e) {
+        console.error("SDK client engine allocation error:", e);
+    }
+
+    function updateLog(message) {
+        const consoleEl = document.getElementById("consoleLog");
+        if (consoleEl) {
+            consoleEl.innerText = `[LOG] ${new Date().toLocaleTimeString()}:\n${message}`;
+        }
+    }
+
+    // THE CRITICAL FIX: Exposed globally to window to fire instantly on the user gesture
+    window.connectWallet = async function() {
+        const btn = document.getElementById("connectWalletBtn");
         
-        let userAddress = null;
-        let genlayerClient = null;
-
-        // Initialize general public client network reading capabilities
-        try {
-            genlayerClient = createClient({ rpcUrl: GENLAYER_RPC_URL });
-        } catch(e) {
-            console.error("SDK client engine allocation crash:", e);
-        }
-
-        function updateLog(message) {
-            document.getElementById("consoleLog").innerText = `[LOG] ${new Date().toLocaleTimeString()}:\n${message}`;
-        }
-
-        // Action Fix: Triggers the real wallet popup safely inside a direct button context click
-        async function connectWallet() {
-            const btn = document.getElementById("connectWalletBtn");
-            if (typeof window !== 'undefined' && typeof window.ethereum !== 'undefined') {
-                try {
-                    updateLog("Opening interactive browser wallet extension popup window...");
-                    // EIP-1193 standard direct human intent request pops up the window immediately
-                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    userAddress = accounts[0];
-                    
-                    // Assign account structure to our active SDK client
-                    genlayerClient = createClient({ rpcUrl: GENLAYER_RPC_URL, account: userAddress });
-                    
-                    btn.innerText = `Connected: ${userAddress.slice(0,6)}...${userAddress.slice(-4)}`;
-                    btn.style.backgroundColor = "#34c759";
-                    updateLog(`Wallet Connected Successfully via SDK!\nActive account: ${userAddress}`);
-                } catch (e) {
-                    updateLog(`Wallet interaction refused or rejected: ${e.message}`);
-                }
-            } else {
-                updateLog("Error: No browser wallet detected. Please install a Web3 Wallet (MetaMask or GenLayer).");
-                alert("No wallet client found! Please install a Web3 extension to run live state writes.");
-            }
-        }
-
-        // Real SDK Client Contract Write Implementation
-        async function runContractWrite(methodName, argsArray, actionLabel) {
-            if (!userAddress) {
-                updateLog(`Error: You must connect your GenLayer wallet before executing [${actionLabel}].`);
-                return;
-            }
-            updateLog(`Requesting real user signature via SDK for action: ${actionLabel}...`);
-            
+        if (typeof window !== 'undefined' && window.ethereum) {
             try {
-                // Broadcast transaction payload live to GenVM layer using the official client
-                const tx = await genlayerClient.sendTransaction({
-                    to: CONTRACT_ADDRESS,
-                    data: { method: methodName, args: argsArray }
-                });
+                updateLog("Opening interactive browser wallet extension popup window...");
                 
-                updateLog(`Transaction broadcasted to network!\nHash: ${tx.hash}\nAwaiting consensus block mining confirmation receipts...`);
-                const receipt = await genlayerClient.waitForTransactionReceipt({ hash: tx.hash });
+                // Direct request inside click gesture bypasses browser popup blocker completely
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
                 
-                if (receipt.status === 'success') {
-                    updateLog(`[Success] ${actionLabel} completed on-chain in Block #${receipt.blockNumber}`);
+                // Correctly grab string format address from accounts payload array
+                userAddress = Array.isArray(accounts) ? accounts[0] : accounts;
+                
+                // Map the active account to your live SDK client configuration
+                genlayerClient = createClient({ rpcUrl: GENLAYER_RPC_URL, account: userAddress });
+                
+                // Slices string cleanly to display short version layout on button
+                if (userAddress && typeof userAddress === 'string') {
+                    btn.innerText = `Connected: ${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`;
                 } else {
-                    updateLog(`Execution Reverted: Smart contract parameters rejected transaction processing.`);
+                    btn.innerText = "Wallet Linked";
                 }
-            } catch (err) {
-                updateLog(`Transaction Transmission Failed:\n${err.message}`);
-            }
-        }
-
-        async function triggerCreateTask() {
-            const title = document.getElementById("taskTitle").value;
-            const criteria = document.getElementById("taskCriteria").value;
-            if (!title || !criteria) return updateLog("Error: Missing parameters.");
-            await runContractWrite("create_task", [title, "Project submission payload tracking", criteria], "Create Task");
-        }
-
-        async function triggerClaimTask() {
-            const id = document.getElementById("taskId").value;
-            if (!id) return updateLog("Error: Missing Task ID.");
-            await runContractWrite("claim_task", [String(id)], "Claim Task");
-        }
-
-        async function triggerSubmitProof() {
-            const id = document.getElementById("taskId").value;
-            const url = document.getElementById("proofUrl").value;
-            if (!id || !url) return updateLog("Error: Missing parameters.");
-            await runContractWrite("submit_proof", [String(id), url], "Submit Proof");
-        }
-
-        async function triggerVerifyTask() {
-            const id = document.getElementById("taskId").value;
-            if (!id) return updateLog("Error: Missing Task ID.");
-            await runContractWrite("verify_task", [String(id)], "Execute AI Auditing");
-        }
-
-        // Task Fix 2: Erased mock state objects entirely and wired up true live contract call reads
-        async function readTaskState() {
-            const id = document.getElementById("taskId").value;
-            if (!id) return updateLog("Error: Provide a Task ID to read state.");
-            
-            updateLog(`Querying contract-derived read view method: get_task(${id}) via GenLayer SDK client...`);
-            
-            try {
-                // Fetch direct read contract parameters using genlayer-js public reader client
-                const rawResult = await genlayerClient.readContract({
-                    to: CONTRACT_ADDRESS,
-                    data: { method: "get_task", args: [String(id)] }
-                });
-
-                if (!rawResult || rawResult === "{}") throw new Error("Empty block response returned. Task ID does not exist.");
                 
-                const parsedTask = typeof rawResult === 'string' ? JSON.parse(rawResult) : rawResult;
-                
-                // Real production logging statement reading live variable contract context fields
-                updateLog(`Contract-Derived Read View Success! Status: ${parsedTask.status || 'unknown'}\nFull Data Object:\n${JSON.stringify(parsedTask, null, 2)}`);
-            } catch (err) {
-                updateLog(`State Read Failed: ${err.message || 'GenLayer RPC node unreachable.'}`);
+                btn.style.backgroundColor = "#34c759"; // Turn button green upon connection
+                updateLog(`Wallet Connected Successfully via SDK!\nActive account: ${userAddress}`);
+            } catch (e) {
+                updateLog(`Wallet interaction refused or rejected: ${e.message}`);
             }
+        } else {
+            updateLog("Error: No browser wallet detected. Please install a Web3 Wallet (MetaMask or GenLayer).");
+            alert("No wallet client found! Please install a Web3 extension like MetaMask to connect.");
         }
+    };
+
+    // Real SDK Client Contract Write Implementation
+    async function runContractWrite(methodName, argsArray, actionLabel) {
+        if (!userAddress) {
+            updateLog(`Error: You must connect your GenLayer wallet before executing [${actionLabel}].`);
+            return;
+        }
+        updateLog(`Requesting real user signature via SDK for action: ${actionLabel}...`);
+        
+        try {
+            const tx = await genlayerClient.sendTransaction({
+                to: CONTRACT_ADDRESS,
+                data: { method: methodName, args: argsArray }
+            });
+            
+            updateLog(`Transaction broadcasted to network!\nHash: ${tx.hash}\nAwaiting consensus block mining confirmation receipts...`);
+            const receipt = await genlayerClient.waitForTransactionReceipt({ hash: tx.hash });
+            
+            if (receipt.status === 'success') {
+                updateLog(`[Success] ${actionLabel} completed on-chain in Block #${receipt.blockNumber}`);
+            } else {
+                updateLog(`Execution Reverted: Smart contract parameters rejected transaction processing.`);
+            }
+        } catch (err) {
+            updateLog(`Transaction Transmission Failed:\n${err.message}`);
+        }
+    }
+
+    window.triggerCreateTask = async function() {
+        const title = document.getElementById("taskTitle").value;
+        const criteria = document.getElementById("taskCriteria").value;
+        if (!title || !criteria) return updateLog("Error: Missing parameters.");
+        await runContractWrite("create_task", [title, "Project submission payload tracking", criteria], "Create Task");
+    };
+
+    window.triggerClaimTask = async function() {
+        const id = document.getElementById("taskId").value;
+        if (!id) return updateLog("Error: Missing Task ID.");
+        await runContractWrite("claim_task", [String(id)], "Claim Task");
+    };
+
+    window.triggerSubmitProof = async function() {
+        const id = document.getElementById("taskId").value;
+        const url = document.getElementById("proofUrl").value;
+        if (!id || !url) return updateLog("Error: Missing parameters.");
+        await runContractWrite("submit_proof", [String(id), url], "Submit Proof");
+    };
+
+    window.triggerVerifyTask = async function() {
+        const id = document.getElementById("taskId").value;
+        if (!id) return updateLog("Error: Missing Task ID.");
+        await runContractWrite("verify_task", [String(id)], "Execute AI Auditing");
+    };
+
+    window.readTaskState = async function() {
+        const id = document.getElementById("taskId").value;
+        if (!id) return updateLog("Error: Provide a Task ID to read state.");
+        
+        updateLog(`Querying contract-derived read view method: get_task(${id}) via GenLayer SDK client...`);
+        
+        try {
+            const rawResult = await genlayerClient.readContract({
+                to: CONTRACT_ADDRESS,
+                data: { method: "get_task", args: [String(id)] }
+            });
+
+            if (!rawResult || rawResult === "{}") throw new Error("Empty block response returned. Task ID does not exist.");
+            const parsedTask = typeof rawResult === 'string' ? JSON.parse(rawResult) : rawResult;
+            
+            updateLog(`Contract-Derived Read View Success! Status: ${parsedTask.status || 'unknown'}\nFull Data Object:\n${JSON.stringify(parsedTask, null, 2)}`);
+        } catch (err) {
+            updateLog(`State Read Failed: ${err.message || 'GenLayer RPC node unreachable.'}`);
+        }
+    };
+</script>
 
