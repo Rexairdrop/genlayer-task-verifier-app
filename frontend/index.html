@@ -4,7 +4,7 @@
     <meta charset="UTF-8"> 
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
     <title>AI Task Verifier DApp - Production</title> 
-    <!-- Preserved Template Layout UI CSS Stylesheets -->
+    <!-- Preserved Template Layout UI CSS Stylesheets (Untouched) -->
     <style> 
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f7; padding: 40px; margin: 0; color: #333; } 
         .card { max-width: 600px; background: white; margin: 0 auto 20px; padding: 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); } 
@@ -30,7 +30,6 @@
     <div class="card"> 
         <h2>GenLayer AI Task Verifier</h2> 
         <p>Connected to Contract Address: <code id="contractAddressDisplay">0x919bb40F757F4eb50FcC7fBBf5E703FC8463CF38</code></p> 
-        <!-- Fixed explicit button hook to target the selection menu modal -->
         <button id="connectWalletBtn" onclick="openWalletModal()">Connect Genlayer Wallet</button> 
     </div> 
  
@@ -83,7 +82,11 @@
  
     <script> 
         const CONTRACT_ADDRESS = "0x919bb40F757F4eb50FcC7fBBf5E703FC8463CF38"; 
-        const RPC_URL = "http://localhost:4000/api"; 
+        
+        // PRODUCTION PROTOCOL FIX: Automatically maps HTTP on localhost, and strict HTTPS on Vercel
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const RPC_URL = isLocalhost ? "http://localhost:4000/api" : "https://genlayer.com"; 
+        
         let userAddress = null;
         let activeProvider = null;
 
@@ -119,8 +122,7 @@
                 provider = window.ethereum && !window.ethereum.isGenLayer ? window.ethereum : null;
                 updateLog("Connecting to MetaMask Extension...");
             } else if (walletType === 'simulator') {
-                // THE ULTIMATE FALLBACK: Restores mock operation state if extension handshake isn't injected
-                userAddress = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"; // Standard default simulator account
+                userAddress = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"; 
                 btn.innerText = `Connected: Sim-Account`;
                 btn.style.backgroundColor = "#eab308";
                 updateLog(`Mock Wallet Connected Successfully via Simulator Route!\nActive testing account address: ${userAddress}`);
@@ -131,8 +133,7 @@
                 try {
                     btn.innerText = "Connecting...";
                     const accounts = await provider.request({ method: 'eth_requestAccounts' });
-                    
-                    const extractedAddress = Array.isArray(accounts) ? accounts[0] : accounts;
+                    const extractedAddress = Array.isArray(accounts) ? accounts : accounts;
                     
                     if (extractedAddress) {
                         userAddress = extractedAddress;
@@ -149,7 +150,6 @@
             } else {
                 btn.innerText = "Connect Genlayer Wallet";
                 updateLog(`Error: chosen extension was not found active in this browser window. Initializing local sandbox fallback path...`);
-                // Auto Fallback to unfreeze the buttons if no extension exists
                 userAddress = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
                 btn.innerText = `Connected: Sim-Account`;
                 btn.style.backgroundColor = "#eab308";
