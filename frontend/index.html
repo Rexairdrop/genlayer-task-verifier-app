@@ -1,202 +1,76 @@
-<!DOCTYPE html> 
-<html lang="en"> 
-<head> 
-    <meta charset="UTF-8"> 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
-    <title>AI Task Verifier DApp - Production</title> 
-    <style> 
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f7; padding: 40px; margin: 0; color: #333; } 
-        .card { max-width: 600px; background: white; margin: 0 auto 20px; padding: 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); } 
-        h2, h3 { margin-top: 0; color: #1d1d1f; } 
-        input, textarea, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; } 
-        button { background: #0071e3; color: white; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; } 
-        button:hover { background: #0077ed; } 
-        .log-box { background: #1e1e1e; color: #00ff00; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 13px; min-height: 60px; word-wrap: break-word; white-space: pre-wrap; } 
-        code { background: #e8e8ed; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #bf4040; font-size: 14px; } 
-    </style> 
-</head> 
-<body> 
- 
-    <div class="card"> 
-        <h2>GenLayer AI Task Verifier</h2> 
-        <p>Connected to Contract Address: <code id="contractAddressDisplay">0x919bb40F757F4eb50FcC7fBBf5E703FC8463CF38</code></p> 
-        <button id="connectWalletBtn" onclick="connectWallet()">Initialize GenLayer Provider Path</button> 
-    </div> 
- 
-    <!-- Section 1: Create Task --> 
-    <div class="card"> 
-        <h3>1. Create an Intelligent Task Milestone</h3> 
-        <input type="text" id="taskTitle" placeholder="Task Title"> 
-        <textarea id="taskCriteria" placeholder="Strict AI Validation Criteria"></textarea> 
-        <button onclick="triggerCreateTask()">Register Milestone On-Chain</button> 
-    </div> 
- 
-    <!-- Section 2: Actions & Reads --> 
-    <div class="card"> 
-        <h3>2. DApp Workflow Actions & Contract-Derived Reads</h3> 
-        <input type="text" id="taskId" placeholder="Task ID Target (e.g., 0)"> 
-        <input type="text" id="proofUrl" placeholder="Proof Target Link (e.g., GitHub Commit URL)"> 
-         
-        <button onclick="triggerClaimTask()" style="background:#5e5ce6;">Claim Task Target</button> 
-        <button onclick="triggerSubmitProof()" style="background:#ff9f0a;">Submit Work Proof</button> 
-        <button onclick="triggerVerifyTask()">Execute Decentralized AI Auditing</button> 
-        <button onclick="readTaskState()" style="background:#34c759;">Read Task Real-Time On-Chain State</button> 
-    </div> 
- 
-    <!-- System Console Logs --> 
-    <div class="card"> 
-        <h3>System Transaction Console</h3> 
-        <div id="consoleLog" class="log-box">Awaiting local wallet execution commands...</div> 
-    </div> 
- 
-    <script> 
-        const CONTRACT_ADDRESS = "0x919bb40F757F4eb50FcC7fBBf5E703FC8463CF38"; 
-        // Connect directly to the production GenLayer SimNet node RPC endpoint
-        const RPC_URL = "https://genlayer.com"; 
-        let userAddress = null;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Task Verifier DApp - Production</title>
+  <style>
+    body { font-family: sans-serif; background: #121212; color: #fff; padding: 20px; }
+    button { background: #2563eb; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; margin-top: 10px; }
+    button:disabled { background: #4b5563; cursor: not-allowed; }
+    .console { background: #000; padding: 10px; font-family: monospace; color: #22c55e; border-radius: 4px; margin-top: 10px; }
+  </style>
+</head>
+<body>
 
-        function updateLog(message) {
-            document.getElementById("consoleLog").innerText = `[LOG] ${new Date().toLocaleTimeString()}:\n${message}`;
-        }
+  <h2>GenLayer AI Task Verifier</h2>
+  <div>Connected to Contract Address: <code>0x919bb40F757F4eb50FcC7fBBf5E703FC8463CF38</code></div>
 
-        async function connectWallet() {
-            const provider = window.genlayer || window.ethereum;
-            if (provider) {
-                try {
-                    const accounts = await provider.request({ method: 'eth_requestAccounts' });
-                    if (accounts && accounts.length > 0) {
-                        userAddress = accounts[0];
-                        updateLog(`Wallet Connected Successfully!\nAccount address: ${userAddress}`);
-                        document.getElementById("connectWalletBtn").innerText = `Connected: ${userAddress.substring(0,6)}...${userAddress.substring(userAddress.length-4)}`;
-                    } else {
-                        updateLog("Wallet Authorization Error: No active account profiles returned.");
-                    }
-                } catch (e) {
-                    updateLog("Wallet connection request rejected by user.");
-                }
-            } else {
-                updateLog("Missing wallet provider: A real web3 browser extension wallet is required to proceed. Connection halted.");
-            }
-        }
+  <hr style="border-color: #333; margin: 20px 0;">
 
-        // True transaction pipeline communicating directly with the GenLayer network endpoint
-        async function sendGenLayerTransaction(methodName, argsArray) {
-            if (!userAddress) {
-                updateLog("Transaction blocked: Please connect your real browser wallet signer first.");
-                return null;
-            }
+  <!-- SECTION CHANGED: "Initialize GenLayer Provider Path" turned into "Connect Wallet" -->
+  <h3>Connect Wallet</h3>
+  <button id="connectWalletBtn">Connect Wallet</button>
 
-            updateLog(`Constructing transaction envelope payload...\nTarget Method: ${methodName}\nArgs: ${JSON.stringify(argsArray)}`);
-            
-            try {
-                const response = await fetch(RPC_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jsonrpc: "2.0",
-                        method: "gen_sendTransaction",
-                        params: {
-                            from: userAddress,
-                            to: CONTRACT_ADDRESS,
-                            data: { method: methodName, args: argsArray }
-                        },
-                        id: 1
-                    })
-                });
-                
-                const resData = await response.json();
-                
-                if (resData.error) {
-                    throw new Error(`RPC Failure: ${resData.error.message || JSON.stringify(resData.error)}`);
-                }
-                
-                return `Transaction broadcast successful!\nTransaction Hash: ${resData.result}`;
-            } catch (err) {
-                throw new Error(`GenLayer RPC request failed. Check your network connection.\nDetails: ${err.message}`);
-            }
-        }
+  <hr style="border-color: #333; margin: 20px 0;">
 
-        async function triggerCreateTask() {
-            const title = document.getElementById("taskTitle").value;
-            const criteria = document.getElementById("taskCriteria").value;
-            if (!title || !criteria) return updateLog("Error: Missing parameters.");
-            
-            try {
-                const result = await sendGenLayerTransaction("create_task", [title, "Project submission payload tracking", criteria]);
-                if (result) updateLog(result);
-            } catch (error) {
-                updateLog(`The contract call failed: ${error.message}`);
-            }
-        }
+  <h3>1. Create an Intelligent Task Milestone</h3>
+  <button disabled>Register Milestone On-Chain</button>
 
-        async function triggerClaimTask() {
-            const id = document.getElementById("taskId").value;
-            if (!id) return updateLog("Error: Missing Task ID.");
-            
-            try {
-                const result = await sendGenLayerTransaction("claim_task", [String(id)]);
-                if (result) updateLog(result);
-            } catch (error) {
-                updateLog(`The contract call failed: ${error.message}`);
-            }
-        }
+  <h3>2. DApp Workflow Actions & Contract-Derived Reads</h3>
+  <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+    <button disabled>Claim Task Target</button>
+    <button disabled>Submit Work Proof</button>
+    <button disabled>Execute Decentralized AI Auditing</button>
+    <button disabled>Read Task Real-Time On-Chain State</button>
+  </div>
 
-        async function triggerSubmitProof() {
-            const id = document.getElementById("taskId").value;
-            const url = document.getElementById("proofUrl").value;
-            if (!id || !url) return updateLog("Error: Missing parameters.");
-            
-            try {
-                const result = await sendGenLayerTransaction("submit_proof", [String(id), url]);
-                if (result) updateLog(result);
-            } catch (error) {
-                updateLog(`The contract call failed: ${error.message}`);
-            }
-        }
+  <h3>System Transaction Console</h3>
+  <div class="console" id="logConsole">Awaiting local wallet execution commands...</div>
 
-        async function triggerVerifyTask() {
-            const id = document.getElementById("taskId").value;
-            if (!id) return updateLog("Error: Missing Task ID.");
-            
-            updateLog(`Triggering AI node execution runtime... Executing run_nondet_unsafe consensus loops over Task #${id}...`);
-            try {
-                const result = await sendGenLayerTransaction("verify_task", [String(id)]);
-                if (result) updateLog(result);
-            } catch (error) {
-                updateLog(`The contract call failed: ${error.message}`);
-            }
-        }
+  <!-- CORE DAPP LOGIC MODULE CONNECTION -->
+  <script type="module">
+    import { useDAppWorkflow } from './hooks/useDAppWorkflow.js';
 
-        async function readTaskState() {
-            const id = document.getElementById("taskId").value;
-            if (!id) return updateLog("Error: Provide a Task ID to read state.");
-            
-            updateLog(`Querying contract-derived read view method: get_task(${id})...`);
-            
-            try {
-                const response = await fetch(RPC_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jsonrpc: "2.0",
-                        method: "gen_call",
-                        params: { to: CONTRACT_ADDRESS, data: { method: "get_task", args: [String(id)] } },
-                        id: 1
-                    })
-                });
-                
-                const resData = await response.json();
-                
-                if (resData.error) {
-                    throw new Error(resData.error.message || JSON.stringify(resData.error));
-                }
+    // 1. Initialize the custom hook logic workflow
+    const dApp = useDAppWorkflow();
+    
+    const connectBtn = document.getElementById('connectWalletBtn');
+    const logConsole = document.getElementById('logConsole');
 
-                if (!resData.result || resData.result === "{}") {
-                    throw new Error("Target task record does not exist on-chain.");
-                }
+    // 2. Bind click interaction directly to user gesture to clear browser popup blockers
+    connectBtn.addEventListener('click', async () => {
+      // Direct call ensures the window.ethereum request runs immediately inside the listener
+      const accounts = await dApp.connectWallet();
+      
+      if (accounts && accounts.length > 0) {
+        const address = accounts[0];
+        connectBtn.innerText = `Connected: ${address.slice(0,6)}...${address.slice(-4)}`;
+        connectBtn.style.backgroundColor = "#16a34a"; // Changes button color to green on successful connection
+      }
+    });
 
-                // Parse and display raw blockchain output with zero fallback overrides
-                const taskData = typeof resData.result === 'string' ? JSON.parse(resData.result) : resData.result;
-                updateLog(`Contract-Derived Read View Success!\nOn-Chain State Results:\n${JSON.stringify(taskData, null, 2)}`);
-                
-            } catch (err) {
+    // 3. Keep the user interface updated with custom state logs from the hook
+    setInterval(() => {
+      if (dApp.logs && dApp.logs.length > 0) {
+        const latestLog = dApp.logs[dApp.logs.length - 1];
+        logConsole.innerText = latestLog.text;
+        if (latestLog.type === 'error') logConsole.style.color = '#ef4444';
+        if (latestLog.type === 'success') logConsole.style.color = '#22c55e';
+        if (latestLog.type === 'pending') logConsole.style.color = '#eab308';
+      }
+    }, 500);
+  </script>
+
+</body>
+</html>
