@@ -24,6 +24,16 @@
         .close-modal { margin-top: 15px; font-size: 14px; color: #86868b; background: transparent; border: none; font-weight: normal; width: auto; text-decoration: underline; cursor: pointer; padding: 5px; }
         .close-modal:hover { color: #1d1d1f; background: transparent; }
     </style> 
+
+    <!-- Dynamic ES Module Import Map to Load Official GenLayer Browser SDK Client Bundle -->
+    <script type="importmap">
+      {
+        "imports": {
+          "genlayer-js": "https://unpkg.com",
+          "genlayer-js/chains": "https://unpkg.com"
+        }
+      }
+    </script>
 </head> 
 <body> 
  
@@ -72,32 +82,40 @@
                 <span>🦊</span> MetaMask Wallet
             </div>
             
-            <div class="wallet-option" onclick="selectWalletProvider('simulator')" style="border-style: dashed; background: #fffbeb;">
-                <span>🛠️</span> Run Simulator Account (Mock State Fallback)
-            </div>
+            <!-- FIXED: REMOVED ALL MOCK ACCOUNT BUTTON OPTIONS AND FALLBACK LOGIC PATHS HERE -->
             
             <button class="close-modal" onclick="closeModalDirectly()">Cancel</button>
         </div>
     </div>
  
-    <script> 
+    <script type="module"> 
+        import { createClient } from 'genlayer-js';
+        import { testnetBradbury } from 'genlayer-js/chains';
+
         const CONTRACT_ADDRESS = "0x919bb40F757F4eb50FcC7fBBf5E703FC8463CF38"; 
-        
-        // Dynamic protocol check switches between dev localnet and official deployment chains
-        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const RPC_URL = isLocalhost ? "http://localhost:4000/api" : "https://rpc.studionet.genlayer.com"; 
+        const ACTIVE_CHAIN = testnetBradbury; 
         
         let userAddress = null;
-        let activeProvider = null;
+        let readClient = null;
+        let writeClient = null;
 
-        function updateLog(message) {
+        // Establish core public network reader node reference via official SDK interfaces
+        try {
+            readClient = createClient({ chain: ACTIVE_CHAIN });
+        } catch (e) {
+            console.error("SDK initialization error:", e);
+        }
+
+        function updateLog(message, type = 'info') {
             const consoleEl = document.getElementById("consoleLog");
             if (consoleEl) {
                 consoleEl.innerText = `[LOG] ${new Date().toLocaleTimeString()}:\n${message}`;
+                if (type === 'error') consoleEl.style.color = '#ef4444';
+                else if (type === 'success') consoleEl.style.color = '#34c759';
+                else consoleEl.style.color = '#00ff00';
             }
         }
 
-        // Explicit Global Bindings to ensure native onclick layers locate the actions instantly
         window.openWalletModal = function() {
             document.getElementById('walletModal').style.display = 'flex';
         };
@@ -110,6 +128,7 @@
             document.getElementById('walletModal').style.display = 'none';
         };
 
+        // EXCLUSIVE ARCHITECTURAL PATHWAYS: Only accepts and registers certified active extensions
         window.selectWalletProvider = async function(walletType) {
             document.getElementById('walletModal').style.display = 'none';
             const btn = document.getElementById("connectWalletBtn");
@@ -121,57 +140,46 @@
             } else if (walletType === 'metamask') {
                 provider = window.ethereum && !window.ethereum.isGenLayer ? window.ethereum : null;
                 updateLog("Connecting to MetaMask Extension...");
-            } else if (walletType === 'simulator') {
-                userAddress = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"; 
-                btn.innerText = `Connected: Sim-Account`;
-                btn.style.backgroundColor = "#eab308";
-                updateLog(`Mock Wallet Connected Successfully via Simulator Route!\nActive testing account address: ${userAddress}`);
-                return;
             }
             
             if (provider) {
                 try {
                     btn.innerText = "Connecting...";
+                    // Request accounts via the selected true extension instance directly
                     const accounts = await provider.request({ method: 'eth_requestAccounts' });
                     const extractedAddress = Array.isArray(accounts) ? accounts[0] : accounts;
                     
                     if (extractedAddress) {
                         userAddress = extractedAddress;
-                        activeProvider = provider;
+                        
+                        // Create true instance client wrapping browser-injected credentials safely
+                        writeClient = createClient({
+                            chain: ACTIVE_CHAIN,
+                            account: userAddress,
+                            provider: provider
+                        });
+
                         btn.innerText = `Connected: ${String(userAddress).slice(0, 6)}...${String(userAddress).slice(-4)}`;
                         btn.style.backgroundColor = "#34c759";
-                        updateLog(`Wallet Connected Successfully!\nType: ${walletType.toUpperCase()}\nActive address: ${userAddress}`);
+                        updateLog(`Wallet Connected Successfully!\nType: ${walletType.toUpperCase()}\nActive address: ${userAddress}`, "success");
+                    } else {
+                        throw new Error("No wallet account is available.");
                     }
                 } catch (e) {
                     btn.innerText = "Connect Genlayer Wallet";
                     btn.style.backgroundColor = "#0071e3";
-                    updateLog(`Connection Cancelled by User: ${e.message}`);
+                    if (e.code === 4001) {
+                        updateLog("Wallet connection was rejected.", "error");
+                    } else {
+                        updateLog(`Wallet Connection Failure: ${e.message}`, "error");
+                    }
                 }
             } else {
                 btn.innerText = "Connect Genlayer Wallet";
-                updateLog(`Error: extension was not found active in this browser. Activating local simulator fallback...`);
-                userAddress = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
-                btn.innerText = `Connected: Sim-Account`;
-                btn.style.backgroundColor = "#eab308";
+                updateLog("No compatible browser wallet provider was detected.", "error");
+                alert("No compatible browser wallet provider was detected. Ensure your extension is active.");
             }
         };
 
-        async function sendGenLayerTransaction(methodName, argsArray) {
-            if (!userAddress) {
-                updateLog(`Error: Connect your wallet first before running operations.`);
-                return null;
-            }
-            updateLog(`Broadcasting transaction payload to GenVM network loop...`);
-            try {
-                const response = await fetch(RPC_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jsonrpc: "2.0",
-                        method: "gen_sendTransaction",
-                        params: {
-                            from: userAddress,
-                            to: CONTRACT_ADDRESS,
-                            data: { method: methodName, args: argsArray }
-                        },
-                        id: 1
+        async function runContractWrite(methodName, argsArray, actionLabel) {
+            if (!userAddress || !writeClient) {
