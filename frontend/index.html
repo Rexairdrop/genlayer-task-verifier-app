@@ -40,7 +40,7 @@
     <div class="card"> 
         <h2>GenLayer AI Task Verifier</h2> 
         <p>Connected to Contract Address: <code id="contractAddressDisplay">0x919bb40F757F4eb50FcC7fBBf5E703FC8463CF38</code></p> 
-        <button id="connectWalletBtn" onclick="openWalletModal()">Connect Genlayer Wallet</button> 
+        <button id="connectWalletBtn">Connect Genlayer Wallet</button> 
     </div> 
  
     <!-- Section 1: Create Task --> 
@@ -104,65 +104,106 @@
             console.error("SDK initialization error:", e);
         }
 
-        function updateLog(message, type = 'info') {
-            const consoleEl = document.getElementById("consoleLog");
-            if (consoleEl) {
-                consoleEl.innerText = `[LOG] ${new Date().toLocaleTimeString()}:\n${message}`;
-                if (type === 'error') consoleEl.style.color = '#ef4444';
-                else if (type === 'success') consoleEl.style.color = '#34c759';
-                else consoleEl.style.color = '#00ff00';
-            }
+            // Bind click handlers directly to bypass HTML module isolation
+    document.addEventListener("DOMContentLoaded", () => {
+        const btn = document.getElementById("connectWalletBtn");
+        
+        if (btn) {
+            btn.addEventListener("click", async () => {
+                // Target standard injected extension (MetaMask / Rabby / GenLayer)
+                const provider = window.ethereum || window.genlayer;
+
+                if (provider) {
+                    try {
+                        btn.innerText = "Connecting...";
+                        updateLog("Requesting account access from wallet extension...");
+
+                        // Request account authorization
+                        const accounts = await provider.request({ method: 'eth_requestAccounts' });
+                        const extractedAddress = Array.isArray(accounts) ? accounts[0] : accounts;
+
+                        if (extractedAddress) {
+                            userAddress = extractedAddress;
+
+                            // Correctly initialize your writeClient using the imported SDK tool
+                            writeClient = createClient({
+                                chain: ACTIVE_CHAIN,
+                                account: userAddress,
+                                provider: provider
+                            });
+
+                            btn.innerText = `Connected: ${String(userAddress).slice(0, 6)}...${String(userAddress).slice(-4)}`;
+                            btn.style.backgroundColor = "#34c759";
+                            updateLog(`Successfully linked wallet address: ${userAddress}`, "success");
+                        }
+                    } catch (err) {
+                        console.error("Connection rejected:", err);
+                        btn.innerText = "Connection Failed";
+                        updateLog(`Wallet connection error: ${err.message || err}`, "error");
+                        setTimeout(() => { btn.innerText = "Connect Genlayer Wallet"; }, 3000);
+                    }
+                } else {
+                    updateLog("Error: No Web3 wallet extension detected in this browser.", "error");
+                    alert("Please install or unlock MetaMask, Rabby, or GenLayer extension to continue.");
+                }
+            });
         }
+    });
 
-        window.openWalletModal = function() {
-            document.getElementById('walletModal').style.display = 'flex';
-        };
-
-        window.closeWalletModal = function(event) {
-            document.getElementById('walletModal').style.display = 'none';
-        };
-
-        window.closeModalDirectly = function() {
-            document.getElementById('walletModal').style.display = 'none';
-        };
 
                 // EXCLUSIVE ARCHITECTURAL PATHWAYS: Only accepts and registers certified active extensions
-        window.selectWalletProvider = async function(walletType) {
-            document.getElementById('walletModal').style.display = 'none';
-            const btn = document.getElementById("connectWalletBtn");
-            
-            // Check for MetaMask or Rabby injected provider instance
-            const provider = window.ethereum;
+         <script type="module">
+    // Secure global configurations 
+    let userAddress = null;
+    let writeClient = null;
+    const ACTIVE_CHAIN = "mainnet"; // Replace with your target chain configuration if needed
+    const CONTRACT_ADDRESS = "0x919bb40F757F4eb50FcC7fBBf5E703FC8463CF38";
 
-            if (provider) {
-                try {
-                    btn.innerText = "Connecting...";
-                    
-                    // Request accounts via the selected true extension instance directly
-                    const accounts = await provider.request({ method: 'eth_requestAccounts' });
-                    const extractedAddress = Array.isArray(accounts) ? accounts[0] : accounts;
+    // Bind event listener directly to avoid inline scoping problems
+    document.addEventListener("DOMContentLoaded", () => {
+        const btn = document.getElementById("connectWalletBtn");
+        if (btn) {
+            btn.addEventListener("click", async () => {
+                // Safely toggle your selection elements or go straight to wallet discovery
+                const provider = window.ethereum;
 
-                    if (extractedAddress) {
-                        userAddress = extractedAddress;
+                if (provider) {
+                    try {
+                        btn.innerText = "Connecting...";
+                        
+                        // Explicitly pull the primary active account array reference
+                        const accounts = await provider.request({ method: 'eth_requestAccounts' });
+                        const extractedAddress = Array.isArray(accounts) ? accounts[0] : accounts;
 
-                        writeClient = createClient({
-                            chain: ACTIVE_CHAIN,
-                            account: userAddress,
-                            provider: provider
-                        });
+                        if (extractedAddress) {
+                            userAddress = extractedAddress;
 
-                        btn.innerText = `Connected: ${String(userAddress).slice(0, 6)}...${String(userAddress).slice(-4)}`;
-                        btn.style.backgroundColor = "#34c759";
+                            // Initialize client architecture securely
+                            if (typeof createClient === 'function') {
+                                writeClient = createClient({
+                                    chain: ACTIVE_CHAIN,
+                                    account: userAddress,
+                                    provider: provider
+                                });
+                            }
+
+                            btn.innerText = `Connected: ${String(userAddress).slice(0, 6)}...${String(userAddress).slice(-4)}`;
+                            btn.style.backgroundColor = "#34c759";
+                            console.log("Wallet connection active:", userAddress);
+                        }
+                    } catch (err) {
+                        console.error("Wallet connection explicitly rejected:", err);
+                        btn.innerText = "Connection Failed";
+                        setTimeout(() => { btn.innerText = "Connect Genlayer Wallet"; }, 3000);
                     }
-                } catch (err) {
-                    console.error("Wallet connection rejected:", err);
-                    btn.innerText = "Connect Wallet Failed";
+                } else {
+                    alert("No Web3 wallet extension detected! Please ensure MetaMask or Rabby is installed and active.");
+                    btn.innerText = "Connect Genlayer Wallet";
                 }
-            } else {
-                alert("No Web3 wallet extension detected! Please install MetaMask or Rabby.");
-                btn.innerText = "Connect Genlayer Wallet";
-            }
-        };
+            });
+        }
+    });
+</script>
 
 
         async function runContractWrite(methodName, argsArray, actionLabel) {
