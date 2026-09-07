@@ -126,29 +126,25 @@
             document.getElementById('walletModal').style.display = 'none';
         };
 
+                // EXCLUSIVE ARCHITECTURAL PATHWAYS: Only accepts and registers certified active extensions
         window.selectWalletProvider = async function(walletType) {
             document.getElementById('walletModal').style.display = 'none';
             const btn = document.getElementById("connectWalletBtn");
-            let provider = null;
             
-            if (walletType === 'genlayer') {
-                provider = window.genlayer || (window.ethereum && window.ethereum.isGenLayer ? window.ethereum : null);
-                updateLog("Connecting to GenLayer Extension...");
-            } else if (walletType === 'metamask') {
-                provider = window.ethereum && !window.ethereum.isGenLayer ? window.ethereum : null;
-                updateLog("Connecting to MetaMask Extension...");
-            }
-            
+            // Check for MetaMask or Rabby injected provider instance
+            const provider = window.ethereum;
+
             if (provider) {
                 try {
                     btn.innerText = "Connecting...";
+                    
+                    // Request accounts via the selected true extension instance directly
                     const accounts = await provider.request({ method: 'eth_requestAccounts' });
                     const extractedAddress = Array.isArray(accounts) ? accounts[0] : accounts;
 
-                    
                     if (extractedAddress) {
                         userAddress = extractedAddress;
-                        
+
                         writeClient = createClient({
                             chain: ACTIVE_CHAIN,
                             account: userAddress,
@@ -157,25 +153,17 @@
 
                         btn.innerText = `Connected: ${String(userAddress).slice(0, 6)}...${String(userAddress).slice(-4)}`;
                         btn.style.backgroundColor = "#34c759";
-                        updateLog(`Wallet Connected Successfully!\nType: ${walletType.toUpperCase()}\nActive address: ${userAddress}`, "success");
-                    } else {
-                        throw new Error("No wallet account is available.");
                     }
-                } catch (e) {
-                    btn.innerText = "Connect Genlayer Wallet";
-                    btn.style.backgroundColor = "#0071e3";
-                    if (e.code === 4001) {
-                        updateLog("Wallet connection was rejected.", "error");
-                    } else {
-                        updateLog(`Wallet Connection Failure: ${e.message}`, "error");
-                    }
+                } catch (err) {
+                    console.error("Wallet connection rejected:", err);
+                    btn.innerText = "Connect Wallet Failed";
                 }
             } else {
+                alert("No Web3 wallet extension detected! Please install MetaMask or Rabby.");
                 btn.innerText = "Connect Genlayer Wallet";
-                updateLog("No compatible browser wallet provider was detected.", "error");
-                alert("No compatible browser wallet provider was detected. Ensure your extension is active.");
             }
         };
+
 
         async function runContractWrite(methodName, argsArray, actionLabel) {
             if (!userAddress || !writeClient) {
