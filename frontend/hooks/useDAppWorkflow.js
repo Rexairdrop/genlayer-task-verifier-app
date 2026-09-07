@@ -4,11 +4,47 @@ import { createClient } from 'genlayer-js';
 const CONTRACT_ADDRESS = "0x919bb40F757F4eb50FcC7fBBf5E703FC8463CF38";
 const GENLAYER_RPC_URL = process.env.NEXT_PUBLIC_GENLAYER_RPC_URL || "https://genlayer.com";
 
-export function useDAppWorkflow(account) {
+export function useDAppWorkflow(externalAccount) {
+  // Track local connection state if parent component isn't explicitly passing down a state setter
+  const [localAccount, setLocalAccount] = useState(null);
+  const account = externalAccount || localAccount;
+
   const [logs, setLogs] = useState([{ text: "System initialized. Awaiting true transaction execution...", type: 'info' }]);
   const [isPending, setIsPending] = useState(false);
 
   const addLog = (text, type) => setLogs(prev => [...prev, { text, type }]);
+
+  // FUNCTION 0: THE FIXED CONNECT WALLET CLICK ACTION
+  const connectWallet = async () => {
+    if (typeof window !== 'undefined' && typeof window.ethereum !== 'undefined') {
+      setIsPending(true);
+      addLog("Opening browser wallet extension popup...", "pending");
+      try {
+        // Explicitly triggers the interactive web3 modal popup window
+        const accounts = await window.ethereum.request({ 
+          method: 'eth_requestAccounts' 
+        });
+        
+        if (accounts && accounts.length > 0) {
+          setLocalAccount(accounts[0]);
+          addLog(`Wallet linked successfully! Connected as: ${accounts[0]}`, "success");
+          return accounts[0];
+        }
+      } catch (error) {
+        if (error.code === 4001) {
+          addLog("Connection rejected: User cancelled the wallet modal popup.", "error");
+        } else {
+          addLog(`Popup window blocked or failed: ${error.message}`, "error");
+        }
+      } finally {
+        setIsPending(false);
+      }
+    } else {
+      addLog("Connection Failed: No Web3 wallet found. Please install MetaMask or GenLayer extension.", "error");
+      alert("No browser wallet extension detected! Please install an EIP-1193 wallet.");
+    }
+    return null;
+  };
 
   // Direct Contract Write Wrapper
   const runContractWrite = async (methodName, args, actionLabel) => {
@@ -64,7 +100,7 @@ export function useDAppWorkflow(account) {
     await runContractWrite("verify_task", [String(taskId)], "Verify Task");
   };
 
-  // 5. PURE RPC READ STATE (No mock fallback)
+  // 5. PURE RPC READ STATE
   const readTaskState = async (taskId) => {
     addLog(`Fetching true parameters for Task #${taskId} from blockchain RPC...`, "info");
     try {
@@ -87,5 +123,16 @@ export function useDAppWorkflow(account) {
     }
   };
 
-  return { createTask, claimTask, submitProof, verifyTask, readTaskState, logs, isPending };
+  // Added connectWallet and current active account to the final layout export
+  return { 
+    connectWallet, 
+    account,
+    createTask, 
+    claimTask, 
+    submitProof, 
+    verifyTask, 
+    readTaskState, 
+    logs, 
+    isPending 
+  };
 }
