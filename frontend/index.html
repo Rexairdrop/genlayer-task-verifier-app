@@ -82,8 +82,6 @@
                 <span>🦊</span> MetaMask Wallet
             </div>
             
-            <!-- FIXED: REMOVED ALL MOCK ACCOUNT BUTTON OPTIONS AND FALLBACK LOGIC PATHS HERE -->
-            
             <button class="close-modal" onclick="closeModalDirectly()">Cancel</button>
         </div>
     </div>
@@ -128,7 +126,6 @@
             document.getElementById('walletModal').style.display = 'none';
         };
 
-        // EXCLUSIVE ARCHITECTURAL PATHWAYS: Only accepts and registers certified active extensions
         window.selectWalletProvider = async function(walletType) {
             document.getElementById('walletModal').style.display = 'none';
             const btn = document.getElementById("connectWalletBtn");
@@ -145,14 +142,13 @@
             if (provider) {
                 try {
                     btn.innerText = "Connecting...";
-                    // Request accounts via the selected true extension instance directly
                     const accounts = await provider.request({ method: 'eth_requestAccounts' });
                     const extractedAddress = Array.isArray(accounts) ? accounts[0] : accounts;
+
                     
                     if (extractedAddress) {
                         userAddress = extractedAddress;
                         
-                        // Create true instance client wrapping browser-injected credentials safely
                         writeClient = createClient({
                             chain: ACTIVE_CHAIN,
                             account: userAddress,
@@ -183,3 +179,13 @@
 
         async function runContractWrite(methodName, argsArray, actionLabel) {
             if (!userAddress || !writeClient) {
+                updateLog(`Error: No wallet account is available. Connect your wallet to sign ${actionLabel}.`, "error");
+                return;
+            }
+            updateLog(`Requesting real user signature for [${actionLabel}]...`);
+            
+            try {
+                const hash = await writeClient.sendTransaction({
+                    to: CONTRACT_ADDRESS,
+                    data: { method: methodName, args: argsArray }
+                });
